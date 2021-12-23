@@ -112,6 +112,8 @@ mod macros;
 mod alias;
 
 pub mod entry_api;
+
+use std::borrow::Borrow;
 use entry_api::*;
 
 #[cfg(feature = "nightly")]
@@ -376,16 +378,16 @@ pub trait EntryApi: Keyed {
 }
 
 
-pub trait EntryRefApi<Q: ToOwned<Owned = Self::Key> + ?Sized>: Keyed {
+pub trait EntryRefApi<Q: ?Sized>: Keyed
+where Self::Key: Borrow<Q> {
 	type Occ<'a>: OccupiedEntry<'a, K = Self::Key, V = Self::Item>
 	where
 		Self: 'a,
 		Q: 'a;
-	type Vac<'a, 'b: 'a>: VacantEntry<'a, K = Self::Key, V = Self::Item>
+	type Vac<'a: 'b, 'b>: VacantEntry<'a, K = Self::Key, V = Self::Item>
 	where
 		Self: 'a,
-		Q: 'a + 'b,
-		'a: 'b;
+		Q: 'a + 'b;
 
 	/// Gets the given key's corresponding entry in the map for in-place manipulation.
 	///
@@ -420,7 +422,8 @@ pub trait EntryRefApi<Q: ToOwned<Owned = Self::Key> + ?Sized>: Keyed {
 	/// test.entry_ref(&s).or_insert(s); // the reference to s is still required so it can't be moved to insert
 	/// ```
 	/// Note: implementing this trait for hash map requires the `raw_entry` feature since it makes use of the `hash_raw_entry` nightly feature
-	fn entry_ref<'a, 'b: 'a>(&'a mut self, key: &'b Q) -> Entry<Self::Occ<'a>, Self::Vac<'a, 'b>>;
+	fn entry_ref<'a: 'b, 'b>(&'a mut self, key: &'b Q) -> Entry<Self::Occ<'a>, Self::Vac<'a, 'b>>
+	where Q: 'a+'b;
 }
 
 /// Mutable collection where new elements can be pushed on the front.

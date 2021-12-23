@@ -510,7 +510,7 @@ pub struct RefVacantEntry<Q, Vac> {
 }
 
 #[cfg(feature = "raw_entry")]
-impl<'a, 'b: 'a, Q: ToOwned<Owned = Vac::K> + ?Sized, Vac: RawVacantEntry<'a>> VacantEntry<'a>
+impl<'a, 'b, Q: ToOwned<Owned = Vac::K> + ?Sized, Vac: RawVacantEntry<'a>> VacantEntry<'a>
 	for RefVacantEntry<&'b Q, Vac>
 {
 	type K = Vac::K;
@@ -522,7 +522,7 @@ impl<'a, 'b: 'a, Q: ToOwned<Owned = Vac::K> + ?Sized, Vac: RawVacantEntry<'a>> V
 }
 
 #[cfg(feature = "raw_entry")]
-impl<'a, 'b: 'a, Q: ToOwned<Owned = Vac::K> + Debug, Vac: RawVacantEntry<'a>> Debug
+impl<'a, 'b, Q: ToOwned<Owned = Vac::K> + Debug, Vac: RawVacantEntry<'a>> Debug
 	for RefVacantEntry<&'b Q, Vac>
 {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

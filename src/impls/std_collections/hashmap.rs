@@ -294,15 +294,14 @@ impl<Q: Hash + Eq + ToOwned<Owned = K> + ?Sized, K: Hash + Eq, V, S: BuildHasher
 	where
 		Self: 'a, Q: 'a
 	= crate::RefOccupiedEntry<hash_map::RawOccupiedEntryMut<'a, K, V, S>>;
-	type Vac<'a, 'b>
+	type Vac<'a: 'b, 'b>
 	where
 		Self: 'a,
-		Q: 'b,
-		'b: 'a,
-		'a: 'b,
+		Q: 'a + 'b,
 	= crate::RefVacantEntry<&'b Q, hash_map::RawVacantEntryMut<'a, K, V, S>>;
 
-	fn entry_ref<'a, 'b: 'a>(&'a mut self, key: &'b Q) -> Entry<Self::Occ<'a>, Self::Vac<'a, 'b>> {
+	fn entry_ref<'a: 'b, 'b>(&'a mut self, key: &'b Q) -> Entry<Self::Occ<'a>, Self::Vac<'a, 'b>>
+	where Q: 'a + 'b {
 		let raw = self.raw_entry_mut();
 		match raw.from_key(key) {
 			hash_map::RawEntryMut::Occupied(occ) => Entry::Occupied(crate::RefOccupiedEntry(occ)),
