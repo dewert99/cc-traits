@@ -344,11 +344,11 @@ pub trait MapInsert<K>: Collection {
 }
 
 /// Mutable map that supports the entry api
-pub trait EntryApi: Keyed {
-	type Occ<'a>: OccupiedEntry<'a, K = Self::Key, V = Self::Item>
+pub trait EntryApi: CollectionMut + KeyedRef {
+	type Occ<'a>: OccupiedEntry<'a, Self>
 	where
 		Self: 'a;
-	type Vac<'a>: KeyVacantEntry<'a, K = Self::Key, V = Self::Item>
+	type Vac<'a>: KeyVacantEntry<'a, Self>
 	where
 		Self: 'a;
 
@@ -378,13 +378,13 @@ pub trait EntryApi: Keyed {
 }
 
 
-pub trait EntryRefApi<Q: ?Sized>: Keyed
+pub trait EntryRefApi<Q: ?Sized>: CollectionMut + KeyedRef
 where Self::Key: Borrow<Q> {
-	type Occ<'a>: OccupiedEntry<'a, K = Self::Key, V = Self::Item>
+	type Occ<'a>: OccupiedEntry<'a, Self>
 	where
 		Self: 'a,
 		Q: 'a;
-	type Vac<'a: 'b, 'b>: VacantEntry<'a, K = Self::Key, V = Self::Item>
+	type Vac<'a: 'b, 'b>: VacantEntry<'a, Self>
 	where
 		Self: 'a,
 		Q: 'a + 'b;

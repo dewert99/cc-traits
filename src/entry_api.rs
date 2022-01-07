@@ -1,8 +1,13 @@
+use std::borrow::Borrow;
+use std::fmt;
+use std::fmt::Debug;
+use Entry::*;
+use crate::{CollectionMut, CollectionRef, KeyedRef};
+
+
 /// A view into an occupied entry.
 /// It is part of the [`Entry`] enum.
-pub trait OccupiedEntry<'a>: Sized {
-	type K;
-	type V;
+pub trait OccupiedEntry<'a, C: CollectionMut+KeyedRef>: Sized {
 	/// Gets a reference to the key in the entry.
 	///
 	/// # Examples
@@ -16,7 +21,7 @@ pub trait OccupiedEntry<'a>: Sized {
 	/// map.entry("poneyland").or_insert(12);
 	/// assert_eq!(map.entry("poneyland").key(), &"poneyland");
 	/// ```
-	fn key(&self) -> &Self::K;
+	fn key(&self) -> C::KeyRef<'_>;
 
 	/// Take the ownership of the key and value from the map.
 	///
@@ -37,7 +42,7 @@ pub trait OccupiedEntry<'a>: Sized {
 	///
 	/// assert_eq!(map.contains_key("poneyland"), false);
 	/// ```
-	fn remove_entry(self) -> (Self::K, Self::V);
+	fn remove_entry(self) -> (C::Key, C::Item);
 
 	/// Gets a reference to the value in the entry.
 	///
@@ -55,7 +60,7 @@ pub trait OccupiedEntry<'a>: Sized {
 	///     assert_eq!(o.get(), &12);
 	/// };
 	/// ```
-	fn get(&self) -> &Self::V;
+	fn get(&self) -> C::ItemMut<'_>;
 
 	/// Gets a mutable reference to the value in the entry.
 	///
@@ -86,7 +91,7 @@ pub trait OccupiedEntry<'a>: Sized {
 	///
 	/// assert_eq!(map["poneyland"], 24);
 	/// ```
-	fn get_mut(&mut self) -> &mut Self::V;
+	fn get_mut(&mut self) -> C::ItemMut<'_>;
 
 	/// Converts the `OccupiedEntry` into a mutable reference to the value in the entry
 	/// with a lifetime bound to the map itself.
@@ -113,7 +118,7 @@ pub trait OccupiedEntry<'a>: Sized {
 	///
 	/// assert_eq!(map["poneyland"], 22);
 	/// ```
-	fn into_mut(self) -> &'a mut Self::V;
+	fn into_mut(self) -> C::ItemMut<'a>;
 
 	/// Sets the value of the entry, and returns the entry's old value.
 	///
@@ -134,7 +139,7 @@ pub trait OccupiedEntry<'a>: Sized {
 	///
 	/// assert_eq!(map["poneyland"], 15);
 	/// ```
-	fn insert(&mut self, value: Self::V) -> Self::V;
+	fn insert(&mut self, value: C::Item) -> C::Item;
 
 	/// Takes the value out of the entry, and returns it.
 	///
@@ -154,7 +159,7 @@ pub trait OccupiedEntry<'a>: Sized {
 	///
 	/// assert_eq!(map.contains_key("poneyland"), false);
 	/// ```
-	fn remove(self) -> Self::V {
+	fn remove(self) -> C::Item {
 		self.remove_entry().1
 	}
 }
@@ -162,9 +167,7 @@ pub trait OccupiedEntry<'a>: Sized {
 /// A view into a vacant entry.
 /// It is part of the [`Entry`] enum.
 /// See also [`KeyVacantEntry`] for entries that own there key
-pub trait VacantEntry<'a>: Sized {
-	type K;
-	type V;
+pub trait VacantEntry<'a, C: CollectionMut+KeyedRef>: Sized {
 	/// Sets the value of the entry with the `VacantEntry`'s key,
 	/// and returns a mutable reference to it.
 	///
@@ -183,10 +186,10 @@ pub trait VacantEntry<'a>: Sized {
 	/// }
 	/// assert_eq!(map["poneyland"], 37);
 	/// ```
-	fn insert(self, value: Self::V) -> &'a mut Self::V;
+	fn insert(self, value: C::Item) -> C::ItemMut<'a>;
 }
 
-pub trait KeyVacantEntry<'a>: VacantEntry<'a> {
+pub trait KeyVacantEntry<'a, C: CollectionMut+KeyedRef>: VacantEntry<'a, C> {
 	/// Gets a reference to the key that would be used when inserting a value
 	/// through the `VacantEntry`.
 	///
@@ -200,7 +203,7 @@ pub trait KeyVacantEntry<'a>: VacantEntry<'a> {
 	/// let mut map = make_map();
 	/// assert_eq!(map.entry("poneyland").key(), &"poneyland");
 	/// ```
-	fn key(&self) -> &Self::K;
+	fn key(&self) -> C::KeyRef<'_>;
 
 	/// Take ownership of the key.
 	///
@@ -217,7 +220,7 @@ pub trait KeyVacantEntry<'a>: VacantEntry<'a> {
 	///     v.into_key();
 	/// };
 	/// ```
-	fn into_key(self) -> Self::K;
+	fn into_key(self) -> C::Key;
 }
 
 
@@ -245,13 +248,10 @@ pub enum Entry<Occ, Vac> {
 	Vacant(Vac),
 }
 
-use std::fmt;
-use std::fmt::Debug;
-use Entry::*;
-impl<'a, Occ, Vac> Entry<Occ, Vac>
+impl<'a, Occ, Vac, C: CollectionMut+KeyedRef> Entry<Occ, Vac>
 where
-	Occ: OccupiedEntry<'a>,
-	Vac: VacantEntry<'a, K = Occ::K, V = Occ::V>,
+	Occ: OccupiedEntry<'a, C>,
+	Vac: VacantEntry<'a, C>,
 {
 	/// Ensures a value is in the entry by inserting the default if empty, and returns
 	/// a mutable reference to the value in the entry.
@@ -273,7 +273,7 @@ where
 	/// assert_eq!(map["poneyland"], 6);
 	/// ```
 	#[inline]
-	pub fn or_insert(self, default: Occ::V) -> &'a mut Occ::V {
+	pub fn or_insert(self, default: C::Item) -> C::ItemMut<'a> {
 		match self {
 			Occupied(entry) => entry.into_mut(),
 			Vacant(entry) => entry.insert(default),
@@ -299,7 +299,7 @@ where
 	/// assert_eq!(map["poneyland"], "hoho".to_string());
 	/// ```
 	#[inline]
-	pub fn or_insert_with<F: FnOnce() -> Occ::V>(self, default: F) -> &'a mut Occ::V {
+	pub fn or_insert_with<F: FnOnce() -> C::Item>(self, default: F) -> C::ItemMut<'a> {
 		match self {
 			Occupied(entry) => entry.into_mut(),
 			Vacant(entry) => entry.insert(default()),
@@ -332,7 +332,7 @@ where
 	#[inline]
 	pub fn and_modify<F>(self, f: F) -> Self
 	where
-		F: FnOnce(&mut Occ::V),
+		F: FnOnce(C::ItemMut<'_>),
 	{
 		match self {
 			Occupied(mut entry) => {
@@ -344,10 +344,10 @@ where
 	}
 }
 
-impl<'a, Occ, Vac> Entry<Occ, Vac>
+impl<'a, Occ, Vac, C: CollectionMut+KeyedRef> Entry<Occ, Vac>
 where
-	Occ: OccupiedEntry<'a>,
-	Vac: KeyVacantEntry<'a, K = Occ::K, V = Occ::V>,
+	Occ: OccupiedEntry<'a, C>,
+	Vac: KeyVacantEntry<'a, C>,
 {
 	/// Returns a reference to this entry's key.
 	///
@@ -362,7 +362,7 @@ where
 	/// assert_eq!(map.entry("poneyland").key(), &"poneyland");
 	/// ```
 	#[inline]
-	pub fn key(&self) -> &Occ::K {
+	pub fn key(&self) -> C::KeyRef<'a> {
 		match *self {
 			Occupied(ref entry) => entry.key(),
 			Vacant(ref entry) => entry.key(),
@@ -391,7 +391,7 @@ where
 	///
 	/// assert_eq!(map["poneyland"], 9);
 	/// ```
-	pub fn or_insert_with_key<F: FnOnce(&Occ::K) -> Occ::V>(self, default: F) -> &'a mut Occ::V {
+	pub fn or_insert_with_key<F: FnOnce(C::KeyRef<'a>) -> C::Item>(self, default: F) -> C::ItemMut<'a> {
 		match self {
 			Occupied(entry) => entry.into_mut(),
 			Vacant(entry) => {
@@ -402,11 +402,11 @@ where
 	}
 }
 
-impl<'a, Occ, Vac> Entry<Occ, Vac>
+impl<'a, Occ, Vac, C: CollectionMut+KeyedRef> Entry<Occ, Vac>
 where
-	Occ: OccupiedEntry<'a>,
-	Vac: VacantEntry<'a, K = Occ::K, V = Occ::V>,
-	Occ::V: Default,
+	Occ: OccupiedEntry<'a, C>,
+	Vac: VacantEntry<'a, C>,
+	C::Item: Default,
 {
 	/// Ensures a value is in the entry by inserting the default value if empty,
 	/// and returns a mutable reference to the value in the entry.
@@ -427,7 +427,7 @@ where
 	/// # }
 	/// ```
 	#[inline]
-	pub fn or_default(self) -> &'a mut Occ::V {
+	pub fn or_default(self) -> C::ItemMut<'a> {
 		match self {
 			Occupied(entry) => entry.into_mut(),
 			Vacant(entry) => entry.insert(Default::default()),
@@ -435,15 +435,15 @@ where
 	}
 }
 
-impl<'a, Occ, Vac> Debug for Entry<Occ, Vac>
+impl<'a, Occ, Vac, C: CollectionMut+KeyedRef> Debug for Entry<Occ, Vac>
 where
-	Occ: OccupiedEntry<'a> + Debug,
-	Vac: VacantEntry<'a, K = Occ::K, V = Occ::V> + Debug,
+	Occ: OccupiedEntry<'a, C> + Debug,
+	Vac: VacantEntry<'a, C> + Debug,
 {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		match *self {
-			Vacant(ref v) => f.debug_tuple("Entry").field(v).finish(),
-			Occupied(ref o) => f.debug_tuple("Entry").field(o).finish(),
+		match self {
+			Vacant(v) => f.debug_tuple("Entry").field(v).finish(),
+			Occupied(o) => f.debug_tuple("Entry").field(o).finish(),
 		}
 	}
 }
@@ -452,42 +452,40 @@ where
 pub struct RefOccupiedEntry<Occ>(pub(crate) Occ);
 
 #[cfg(feature = "raw_entry")]
-impl<'a, Occ: OccupiedEntry<'a>> OccupiedEntry<'a> for RefOccupiedEntry<Occ> {
-	type K = Occ::K;
-	type V = Occ::V;
+impl<'a, Occ: OccupiedEntry<'a, C>, C: CollectionMut+KeyedRef+CollectionRef> OccupiedEntry<'a, C> for RefOccupiedEntry<Occ> {
 
-	fn key(&self) -> &Self::K {
+	fn key(&self) -> C::KeyRef<'_> {
 		self.0.key()
 	}
 
-	fn remove_entry(self) -> (Self::K, Self::V) {
+	fn remove_entry(self) -> (C::Key, C::Item) {
 		self.0.remove_entry()
 	}
 
-	fn get(&self) -> &Self::V {
+	fn get(&self) -> C::ItemRef<'_> {
 		self.0.get()
 	}
 
-	fn get_mut(&mut self) -> &mut Self::V {
+	fn get_mut(&mut self) -> C::ItemMut<'_> {
 		self.0.get_mut()
 	}
 
-	fn into_mut(self) -> &'a mut Self::V {
+	fn into_mut(self) -> C::ItemMut<'a> {
 		self.0.into_mut()
 	}
 
-	fn insert(&mut self, value: Self::V) -> Self::V {
+	fn insert(&mut self, value: C::Item) -> C::Item {
 		self.0.insert(value)
 	}
 
-	fn remove(self) -> Self::V {
+	fn remove(self) -> C::Item {
 		self.0.remove()
 	}
 }
 
 #[cfg(feature = "raw_entry")]
-impl<'a, Occ: OccupiedEntry<'a>> Debug for RefOccupiedEntry<Occ>
-where Occ::K: Debug, Occ::V: Debug {
+impl<'a, Occ: OccupiedEntry<'a, C>, C: CollectionMut+KeyedRef+CollectionRef> Debug for RefOccupiedEntry<Occ>
+where C::KeyRef<'a>: Debug, C::ItemRef<'a>: Debug {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("RefOccupiedEntry")
 			.field("key", self.key())
@@ -497,10 +495,8 @@ where Occ::K: Debug, Occ::V: Debug {
 }
 
 #[cfg(feature = "raw_entry")]
-pub trait RawVacantEntry<'a>: Sized {
-	type K: 'a;
-	type V: 'a;
-	fn insert(self, key: Self::K, value: Self::V) -> (&'a mut Self::K, &'a mut Self::V);
+pub trait RawVacantEntry<'a, C: CollectionMut+KeyedRef>: Sized {
+	fn insert(self, key: C::Key, value: C::Item) -> (C::KeyRef<'a>, C::ItemMut<'a>);
 }
 
 #[cfg(feature = "raw_entry")]
@@ -510,20 +506,20 @@ pub struct RefVacantEntry<Q, Vac> {
 }
 
 #[cfg(feature = "raw_entry")]
-impl<'a, 'b, Q: ToOwned<Owned = Vac::K> + ?Sized, Vac: RawVacantEntry<'a>> VacantEntry<'a>
+impl<'a, 'b, Q: ?Sized, Vac: RawVacantEntry<'a, C>, C: CollectionMut+KeyedRef> VacantEntry<'a, C>
 	for RefVacantEntry<&'b Q, Vac>
+where C::Key: Borrow<Q>
 {
-	type K = Vac::K;
-	type V = Vac::V;
 
-	fn insert(self, value: Self::V) -> &'a mut Self::V {
+	fn insert(self, value: C::Item) -> C::ItemMut<'a> {
 		self.raw.insert(self.key.to_owned(), value).1
 	}
 }
 
 #[cfg(feature = "raw_entry")]
-impl<'a, 'b, Q: ToOwned<Owned = Vac::K> + Debug, Vac: RawVacantEntry<'a>> Debug
+impl<'a, 'b, Q: Debug, Vac: RawVacantEntry<'a, C>, C: CollectionMut+KeyedRef> Debug
 	for RefVacantEntry<&'b Q, Vac>
+where C::Key: Borrow<Q>
 {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("RefVacantEntry")
