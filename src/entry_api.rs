@@ -13,6 +13,7 @@ type KeyRef<'a, O> = <O as KeyedRef>::KeyRef<'a>;
 /// A view into an occupied entry.
 /// It is part of the [`Entry`] enum.
 pub trait OccupiedEntry<'a>: Sized {
+	/// The collection this entry came from, (used to determine parameter and return types)
 	type Owner: KeyedRef + CollectionMut + CollectionRef + 'a;
 	/// Gets a reference to the key in the entry.
 	///
@@ -174,6 +175,7 @@ pub trait OccupiedEntry<'a>: Sized {
 /// It is part of the [`Entry`] enum.
 /// See also [`KeyVacantEntry`] for entries that own there key
 pub trait VacantEntry<'a>: 'a + Sized {
+	/// The collection this entry came from, (used to determine parameter and return types)
 	type Owner: CollectionMut + KeyedRef;
 	/// Sets the value of the entry with the `VacantEntry`'s key,
 	/// and returns a mutable reference to it.

@@ -154,6 +154,8 @@ impl<K, V, S: BuildHasher> MapIterMut for HashMap<K, V, S> {
 	}
 }
 
+/// A thin wrapper around a [`hashmap::OccupiedEntry`] that keeps it's hasher as phantom data
+/// This is required so that it's owner can be HashMap<K, V, S> which is required for HashMap<K, V, S> to implement EntryApi
 pub struct OccupiedEntryS<'a, K, V, S: 'a>(pub hash_map::OccupiedEntry<'a, K, V>, PhantomData<S>);
 
 impl<'a, K, V, S: 'a + BuildHasher> OccupiedEntry<'a> for OccupiedEntryS<'a, K, V, S> {
