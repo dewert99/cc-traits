@@ -216,17 +216,17 @@ impl<'a, K, V> KeyVacantEntry<'a> for hash_map::VacantEntry<'a, K, V> {
 }
 
 impl<K: Hash + Eq, V, S: BuildHasher> EntryApi for HashMap<K, V, S> {
-	type Occ<'a>
+	type Occupied<'a>
 	where
 		Self: 'a,
 	= hash_map::OccupiedEntry<'a, K, V>;
-	type Vac<'a>
+	type Vacant<'a>
 	where
 		Self: 'a,
 	= hash_map::VacantEntry<'a, K, V>;
 
 	#[inline(always)]
-	fn entry(&mut self, key: Self::Key) -> Entry<Self::Occ<'_>, Self::Vac<'_>> {
+	fn entry(&mut self, key: Self::Key) -> Entry<Self::Occupied<'_>, Self::Vacant<'_>> {
 		match HashMap::entry(self, key) {
 			hash_map::Entry::Occupied(o) => Entry::Occupied(o),
 			hash_map::Entry::Vacant(v) => Entry::Vacant(v),
@@ -295,19 +295,18 @@ impl<Q: Hash + Eq + ToOwned<Owned = K> + ?Sized, K: Hash + Eq, V, S: BuildHasher
 where
 	K: Borrow<Q>,
 {
-	type Occ<'a>
+	type Occupied<'a>
 	where
 		Self: 'a,
 		Q: 'a,
 	= crate::RefOccupiedEntry<hash_map::RawOccupiedEntryMut<'a, K, V, S>>;
-	type Vac<'a>
+	type Vacant<'a>
 	where
 		Self: 'a,
 		Q: 'a,
 	= crate::RefVacantEntry<&'a Q, hash_map::RawVacantEntryMut<'a, K, V, S>>;
 
-	fn entry_ref<'a>(&'a mut self, key: &'a Q) -> Entry<Self::Occ<'a>, Self::Vac<'a>>
-	{
+	fn entry_ref<'a>(&'a mut self, key: &'a Q) -> Entry<Self::Occupied<'a>, Self::Vacant<'a>> {
 		let raw = self.raw_entry_mut();
 		match raw.from_key(key) {
 			hash_map::RawEntryMut::Occupied(occ) => Entry::Occupied(crate::RefOccupiedEntry(occ)),

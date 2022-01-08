@@ -188,11 +188,11 @@ impl<'a> KeyVacantEntry<'a> for serde_json::map::VacantEntry<'a> {
 }
 
 impl EntryApi for serde_json::Map<String, serde_json::Value> {
-	type Occ<'a> = serde_json::map::OccupiedEntry<'a>;
-	type Vac<'a> = serde_json::map::VacantEntry<'a>;
+	type Occupied<'a> = serde_json::map::OccupiedEntry<'a>;
+	type Vacant<'a> = serde_json::map::VacantEntry<'a>;
 
 	#[inline(always)]
-	fn entry(&mut self, key: Self::Key) -> Entry<Self::Occ<'_>, Self::Vac<'_>> {
+	fn entry(&mut self, key: Self::Key) -> Entry<Self::Occupied<'_>, Self::Vacant<'_>> {
 		match serde_json::Map::entry(self, key) {
 			serde_json::map::Entry::Occupied(o) => Entry::Occupied(o),
 			serde_json::map::Entry::Vacant(v) => Entry::Vacant(v),

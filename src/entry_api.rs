@@ -1,7 +1,115 @@
 use crate::{Collection, CollectionMut, CollectionRef, Keyed, KeyedRef};
+use std::borrow::Borrow;
 use std::fmt;
 use std::fmt::Debug;
 use Entry::*;
+
+/// Mutable map that supports the entry api
+pub trait EntryApi: KeyedRef + CollectionRef + CollectionMut {
+	type Occupied<'a>: OccupiedEntry<
+		'a,
+		Key = Self::Key,
+		Item = Self::Item,
+		KeyRef = Self::KeyRef<'a>,
+		ItemRef = Self::ItemRef<'a>,
+		ItemMut = Self::ItemMut<'a>,
+	> where
+		Self: 'a;
+	type Vacant<'a>: KeyVacantEntry<
+		'a,
+		Key = Self::Key,
+		Item = Self::Item,
+		KeyRef = Self::KeyRef<'a>,
+		ItemRef = Self::ItemRef<'a>,
+		ItemMut = Self::ItemMut<'a>,
+	> where
+		Self: 'a;
+
+	/// Gets the given key's corresponding entry in the map for in-place manipulation.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use std::collections::HashMap;
+	/// use std::ops::Index;
+	/// use cc_traits::{entry_api::*, Get};
+	///
+	/// fn make_map() -> impl EntryApi<Key=char,Item=u32> + Index<&'static char, Output=u32> + Get<&'static char> { HashMap::new() }
+	/// let mut letters = make_map();
+	///
+	/// for ch in "a short treatise on fungi".chars() {
+	///     let mut counter = letters.entry(ch).or_insert(0);
+	///     *counter += 1;
+	/// }
+	///
+	/// assert_eq!(letters[&'s'], 2);
+	/// assert_eq!(letters[&'t'], 3);
+	/// assert_eq!(letters[&'u'], 1);
+	/// assert!(!letters.contains_key(&'y'));
+	/// ```
+	fn entry(&mut self, key: Self::Key) -> Entry<Self::Occupied<'_>, Self::Vacant<'_>>;
+}
+
+pub trait EntryRefApi<Q: ?Sized>: KeyedRef + CollectionRef + CollectionMut
+where
+	Self::Key: Borrow<Q>,
+{
+	type Occupied<'a>: OccupiedEntry<
+		'a,
+		Key = Self::Key,
+		Item = Self::Item,
+		KeyRef = Self::KeyRef<'a>,
+		ItemRef = Self::ItemRef<'a>,
+		ItemMut = Self::ItemMut<'a>,
+	> where
+		Self: 'a,
+		Q: 'a;
+	type Vacant<'a>: VacantEntry<
+		'a,
+		Key = Self::Key,
+		Item = Self::Item,
+		KeyRef = Self::KeyRef<'a>,
+		ItemRef = Self::ItemRef<'a>,
+		ItemMut = Self::ItemMut<'a>,
+	> where
+		Self: 'a,
+		Q: 'a;
+
+	/// Gets the given key's corresponding entry in the map for in-place manipulation.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use std::collections::HashMap;
+	/// use std::ops::Index;
+	/// use cc_traits::{entry_api::*, Get};
+	///
+	/// fn make_map() -> impl EntryRefApi<str, Key=String,Item=u32> + Index<&'static str, Output=u32> + Get<&'static str> { HashMap::new() }
+	/// let mut words = make_map();
+	///
+	/// for s in "foo bar bar".split(' ') {
+	///     let mut counter = words.entry_ref(s).or_insert(0);
+	///     *counter += 1;
+	/// }
+	///
+	/// assert_eq!(words["bar"], 2);
+	/// assert_eq!(words["foo"], 1);
+	/// assert!(!words.contains_key("baz"));
+	/// ```
+	///
+	/// ```compile_fail
+	/// use std::collections::HashMap;
+	/// use cc_traits::{EntryRefApi, entry_api::*};
+	///
+	/// fn make_map() -> impl EntryRefApi<String, Key=String, Item=String>{ HashMap::new() }
+	///
+	/// let mut test = make_map();
+	/// let s = "hello world".to_string();
+	/// test.entry_ref(&s).or_insert(s); // the reference to s is still required so it can't be moved to insert
+	/// ```
+	/// Note: implementing this trait for hash map requires the `raw_entry` feature since it makes use of the `hash_raw_entry` nightly feature
+	fn entry_ref<'a>(&'a mut self, key: &'a Q) -> Entry<Self::Occupied<'a>, Self::Vacant<'a>>;
+}
 
 pub trait AssociatedCollection {
 	type Owner;
@@ -23,34 +131,55 @@ where
 
 impl<S: AssociatedCollection> CollectionRef for S
 where
-S::Owner: CollectionRef{
-	type ItemRef<'a> where Self: 'a = <S::Owner as CollectionRef>::ItemRef<'a>;
+	S::Owner: CollectionRef,
+{
+	type ItemRef<'a>
+	where
+		Self: 'a,
+	= <S::Owner as CollectionRef>::ItemRef<'a>;
 
 	#[inline(always)]
-	fn upcast_item_ref<'short, 'long: 'short>(r: Self::ItemRef<'long>) -> Self::ItemRef<'short> where Self: 'long {
+	fn upcast_item_ref<'short, 'long: 'short>(r: Self::ItemRef<'long>) -> Self::ItemRef<'short>
+	where
+		Self: 'long,
+	{
 		S::Owner::upcast_item_ref(r)
 	}
 }
 
 impl<S: AssociatedCollection> CollectionMut for S
+where
+	S::Owner: CollectionMut,
+{
+	type ItemMut<'a>
 	where
-		S::Owner: CollectionMut{
-	type ItemMut<'a> where Self: 'a = <S::Owner as CollectionMut>::ItemMut<'a>;
+		Self: 'a,
+	= <S::Owner as CollectionMut>::ItemMut<'a>;
 
-	fn upcast_item_mut<'short, 'long: 'short>(r: Self::ItemMut<'long>) -> Self::ItemMut<'short> where Self: 'long {
+	fn upcast_item_mut<'short, 'long: 'short>(r: Self::ItemMut<'long>) -> Self::ItemMut<'short>
+	where
+		Self: 'long,
+	{
 		S::Owner::upcast_item_mut(r)
 	}
 }
 
 impl<S: AssociatedCollection> KeyedRef for S
-    where
-        S::Owner: KeyedRef{
-    type KeyRef<'a> where Self: 'a = <S::Owner as KeyedRef>::KeyRef<'a>;
+where
+	S::Owner: KeyedRef,
+{
+	type KeyRef<'a>
+	where
+		Self: 'a,
+	= <S::Owner as KeyedRef>::KeyRef<'a>;
 
 	#[inline(always)]
-	fn upcast_key_ref<'short, 'long: 'short>(r: Self::KeyRef<'long>) -> Self::KeyRef<'short> where Self: 'long {
-        S::Owner::upcast_key_ref(r)
-    }
+	fn upcast_key_ref<'short, 'long: 'short>(r: Self::KeyRef<'long>) -> Self::KeyRef<'short>
+	where
+		Self: 'long,
+	{
+		S::Owner::upcast_key_ref(r)
+	}
 }
 
 /// A view into an occupied entry.
@@ -62,7 +191,7 @@ pub trait OccupiedEntry<'a>: CollectionRef + CollectionMut + KeyedRef + Sized {
 	///
 	/// ```
 	///use std::collections::HashMap;
-	///use cc_traits::{EntryApi, entry_api::*};
+	///use cc_traits::entry_api::*;
 	///
 	/// fn make_map() -> impl EntryApi<Key=&'static str,Item=i32> { HashMap::new() }
 	/// let mut map = make_map();
@@ -77,7 +206,7 @@ pub trait OccupiedEntry<'a>: CollectionRef + CollectionMut + KeyedRef + Sized {
 	///
 	/// ```
 	/// use std::collections::HashMap;
-	/// use cc_traits::{EntryApi, entry_api::*, Get};
+	/// use cc_traits::{entry_api::*, Get};
 	///
 	/// fn make_map() -> impl EntryApi<Key=&'static str,Item=i32> + Get<&'static str> { HashMap::new() }
 	/// let mut map = make_map();
@@ -98,7 +227,7 @@ pub trait OccupiedEntry<'a>: CollectionRef + CollectionMut + KeyedRef + Sized {
 	///
 	/// ```
 	/// use std::collections::HashMap;
-	/// use cc_traits::{EntryApi, entry_api::*};
+	/// use cc_traits::entry_api::*;
 	///
 	/// fn make_map() -> impl EntryApi<Key=&'static str,Item=i32> { HashMap::new() }
 	/// let mut map = make_map();
@@ -122,7 +251,7 @@ pub trait OccupiedEntry<'a>: CollectionRef + CollectionMut + KeyedRef + Sized {
 	/// ```
 	/// use std::collections::HashMap;
 	/// use std::ops::Index;
-	/// use cc_traits::{EntryApi, entry_api::*};
+	/// use cc_traits::entry_api::*;
 	///
 	/// fn make_map() -> impl EntryApi<Key=&'static str,Item=i32> + Index<&'static str, Output=i32> { HashMap::new() }
 	/// let mut map = make_map();
@@ -153,7 +282,7 @@ pub trait OccupiedEntry<'a>: CollectionRef + CollectionMut + KeyedRef + Sized {
 	/// ```
 	/// use std::collections::HashMap;
 	/// use std::ops::Index;
-	/// use cc_traits::{EntryApi, entry_api::*};
+	/// use cc_traits::entry_api::*;
 	///
 	/// fn make_map() -> impl EntryApi<Key=&'static str,Item=i32> + Index<&'static str, Output=i32>{ HashMap::new() }
 	/// let mut map = make_map();
@@ -175,7 +304,7 @@ pub trait OccupiedEntry<'a>: CollectionRef + CollectionMut + KeyedRef + Sized {
 	/// ```
 	/// use std::collections::HashMap;
 	/// use std::ops::Index;
-	/// use cc_traits::{EntryApi, entry_api::*};
+	/// use cc_traits::entry_api::*;
 	///
 	/// fn make_map() -> impl EntryApi<Key=&'static str,Item=i32> + Index<&'static str, Output=i32> { HashMap::new() }
 	/// let mut map = make_map();
@@ -195,7 +324,7 @@ pub trait OccupiedEntry<'a>: CollectionRef + CollectionMut + KeyedRef + Sized {
 	///
 	/// ```
 	/// use std::collections::HashMap;
-	/// use cc_traits::{EntryApi, entry_api::*, Get};
+	/// use cc_traits::{entry_api::*, Get};
 	///
 	/// fn make_map() -> impl EntryApi<Key=&'static str,Item=i32> + Get<&'static str> { HashMap::new() }
 	/// let mut map = make_map();
@@ -224,7 +353,7 @@ pub trait VacantEntry<'a>: CollectionRef + CollectionMut + KeyedRef {
 	/// ```
 	/// use std::collections::HashMap;
 	/// use std::ops::Index;
-	/// use cc_traits::{EntryApi, entry_api::*};
+	/// use cc_traits::entry_api::*;
 	///
 	/// fn make_map() -> impl EntryApi<Key=&'static str,Item=i32> + Index<&'static str, Output=i32> { HashMap::new() }
 	/// let mut map = make_map();
@@ -245,7 +374,7 @@ pub trait KeyVacantEntry<'a>: VacantEntry<'a> {
 	///
 	/// ```
 	/// use std::collections::HashMap;
-	/// use cc_traits::{EntryApi, entry_api::*};
+	/// use cc_traits::entry_api::*;
 	///
 	/// fn make_map() -> impl EntryApi<Key=&'static str,Item=i32> { HashMap::new() }
 	/// let mut map = make_map();
@@ -259,7 +388,7 @@ pub trait KeyVacantEntry<'a>: VacantEntry<'a> {
 	///
 	/// ```
 	/// use std::collections::HashMap;
-	/// use cc_traits::{EntryApi, entry_api::*};
+	/// use cc_traits::entry_api::*;
 	///
 	/// fn make_map() -> impl EntryApi<Key=&'static str,Item=i32> { HashMap::new() }
 	/// let mut map = make_map();
@@ -280,7 +409,7 @@ pub trait KeyVacantEntry<'a>: VacantEntry<'a> {
 /// (eg. [`std::collections::hash_map::Entry`])
 /// it supports the same functionality and has the same variant elements
 /// ```
-/// use cc_traits::{EntryApi, entry_api::*};
+/// use cc_traits::entry_api::*;
 /// use std::collections::hash_map::{HashMap, VacantEntry as HashMapVacantEntry};
 ///
 /// let mut x: HashMap<&'static str, ()> = HashMap::new();
@@ -298,7 +427,15 @@ pub enum Entry<Occ, Vac> {
 impl<'a, Occ, Vac> Entry<Occ, Vac>
 where
 	Occ: 'a + OccupiedEntry<'a>,
-	Vac: 'a + VacantEntry<'a, Key = Occ::Key, Item = Occ::Item, KeyRef<'a> = Occ::KeyRef<'a>, ItemRef<'a> = Occ::ItemRef<'a>, ItemMut<'a> = Occ::ItemMut<'a>>,
+	Vac: 'a
+		+ VacantEntry<
+			'a,
+			Key = Occ::Key,
+			Item = Occ::Item,
+			KeyRef = Occ::KeyRef<'a>,
+			ItemRef = Occ::ItemRef<'a>,
+			ItemMut = Occ::ItemMut<'a>,
+		>,
 {
 	/// Ensures a value is in the entry by inserting the default if empty, and returns
 	/// a mutable reference to the value in the entry.
@@ -308,7 +445,7 @@ where
 	/// ```
 	/// use std::collections::HashMap;
 	/// use std::ops::Index;
-	/// use cc_traits::{EntryApi, entry_api::*};
+	/// use cc_traits::entry_api::*;
 	///
 	/// fn make_map() -> impl EntryApi<Key=&'static str,Item=u32> + Index<&'static str, Output=u32> { HashMap::new() }
 	/// let mut map = make_map();
@@ -335,7 +472,7 @@ where
 	/// ```
 	/// use std::collections::HashMap;
 	/// use std::ops::Index;
-	/// use cc_traits::{EntryApi};
+	/// use cc_traits::entry_api::*;
 	///
 	/// fn make_map() -> impl EntryApi<Key=&'static str,Item=String> + Index<&'static str, Output=String> { HashMap::new() }
 	/// let mut map = make_map();
@@ -361,7 +498,7 @@ where
 	/// ```
 	/// use std::collections::HashMap;
 	/// use std::ops::Index;
-	/// use cc_traits::{EntryApi};
+	/// use cc_traits::entry_api::*;
 	///
 	/// fn make_map() -> impl EntryApi<Key=&'static str,Item=u32> + Index<&'static str, Output=u32> { HashMap::new() }
 	/// let mut map = make_map();
@@ -394,7 +531,15 @@ where
 impl<'a, Occ, Vac> Entry<Occ, Vac>
 where
 	Occ: 'a + OccupiedEntry<'a>,
-	Vac: 'a + KeyVacantEntry<'a, Key = Occ::Key, Item = Occ::Item, KeyRef<'a> = Occ::KeyRef<'a>, ItemRef<'a> = Occ::ItemRef<'a>, ItemMut<'a> = Occ::ItemMut<'a>>,
+	Vac: 'a
+		+ KeyVacantEntry<
+			'a,
+			Key = Occ::Key,
+			Item = Occ::Item,
+			KeyRef = Occ::KeyRef<'a>,
+			ItemRef = Occ::ItemRef<'a>,
+			ItemMut = Occ::ItemMut<'a>,
+		>,
 {
 	/// Returns a reference to this entry's key.
 	///
@@ -402,7 +547,7 @@ where
 	///
 	/// ```
 	/// use std::collections::HashMap;
-	/// use cc_traits::{EntryApi};
+	/// use cc_traits::entry_api::*;
 	///
 	/// fn make_map() -> impl EntryApi<Key=&'static str,Item=u32> { HashMap::new() }
 	/// let mut map = make_map();
@@ -429,7 +574,7 @@ where
 	/// ```
 	/// use std::collections::HashMap;
 	/// use std::ops::Index;
-	/// use cc_traits::{EntryApi};
+	/// use cc_traits::entry_api::*;
 	///
 	/// fn make_map() -> impl EntryApi<Key=&'static str,Item=usize> + Index<&'static str, Output=usize> { HashMap::new() }
 	/// let mut map = make_map();
@@ -455,7 +600,15 @@ where
 impl<'a, Occ, Vac> Entry<Occ, Vac>
 where
 	Occ: 'a + OccupiedEntry<'a>,
-	Vac: 'a + VacantEntry<'a, Key = Occ::Key, Item = Occ::Item, KeyRef<'a> = Occ::KeyRef<'a>, ItemRef<'a> = Occ::ItemRef<'a>, ItemMut<'a> = Occ::ItemMut<'a>>,
+	Vac: 'a
+		+ VacantEntry<
+			'a,
+			Key = Occ::Key,
+			Item = Occ::Item,
+			KeyRef = Occ::KeyRef<'a>,
+			ItemRef = Occ::ItemRef<'a>,
+			ItemMut = Occ::ItemMut<'a>,
+		>,
 	Occ::Item: Default,
 {
 	/// Ensures a value is in the entry by inserting the default value if empty,
@@ -467,7 +620,7 @@ where
 	/// # fn main() {
 	/// use std::collections::HashMap;
 	/// use std::ops::Index;
-	/// use cc_traits::{EntryApi};
+	/// use cc_traits::entry_api::*;
 	///
 	/// fn make_map() -> impl EntryApi<Key=&'static str,Item=Option<u32>> + Index<&'static str, Output=Option<u32>> { HashMap::new() }
 	/// let mut map = make_map();
@@ -561,9 +714,7 @@ pub struct RefVacantEntry<Q, Vac> {
 	pub(crate) raw: Vac,
 }
 
-impl<'a, Q: ?Sized, Vac: RawVacantEntry<'a>> AssociatedCollection
-	for RefVacantEntry<&'a Q, Vac>
-{
+impl<'a, Q: ?Sized, Vac: RawVacantEntry<'a>> AssociatedCollection for RefVacantEntry<&'a Q, Vac> {
 	type Owner = Vac;
 }
 
