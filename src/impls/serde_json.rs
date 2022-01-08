@@ -119,64 +119,62 @@ impl Clear for serde_json::Map<String, serde_json::Value> {
 }
 
 impl<'a> OccupiedEntry<'a> for serde_json::map::OccupiedEntry<'a> {
-	type K = String;
-	type V = serde_json::Value;
+	type Owner = serde_json::Map<String, serde_json::Value>;
 
 	#[inline(always)]
-	fn key(&self) -> &Self::K {
+	fn key(&self) -> &String {
 		serde_json::map::OccupiedEntry::key(self)
 	}
 
 	#[inline(always)]
-	fn remove_entry(self) -> (Self::K, Self::V) {
+	fn remove_entry(self) -> (String, serde_json::Value) {
 		let key = self.key().clone();
 		(key, self.remove()) // serde::json doesn't implement remove_entry so we use this instead
 	}
 
 	#[inline(always)]
-	fn get(&self) -> &Self::V {
+	fn get(&self) -> &serde_json::Value {
 		serde_json::map::OccupiedEntry::get(self)
 	}
 
 	#[inline(always)]
-	fn get_mut(&mut self) -> &mut Self::V {
+	fn get_mut(&mut self) -> &mut serde_json::Value {
 		serde_json::map::OccupiedEntry::get_mut(self)
 	}
 
 	#[inline(always)]
-	fn into_mut(self) -> &'a mut Self::V {
+	fn into_mut(self) -> &'a mut serde_json::Value {
 		serde_json::map::OccupiedEntry::into_mut(self)
 	}
 
 	#[inline(always)]
-	fn insert(&mut self, value: Self::V) -> Self::V {
+	fn insert(&mut self, value: serde_json::Value) -> serde_json::Value {
 		serde_json::map::OccupiedEntry::insert(self, value)
 	}
 
 	#[inline(always)]
-	fn remove(self) -> Self::V {
+	fn remove(self) -> serde_json::Value {
 		serde_json::map::OccupiedEntry::remove(self)
 	}
 }
 
 impl<'a> VacantEntry<'a> for serde_json::map::VacantEntry<'a> {
-	type K = String;
-	type V = serde_json::Value;
+	type Owner = serde_json::Map<String, serde_json::Value>;
 
 	#[inline(always)]
-	fn insert(self, value: Self::V) -> &'a mut Self::V {
+	fn insert(self, value: serde_json::Value) -> &'a mut serde_json::Value {
 		serde_json::map::VacantEntry::insert(self, value)
 	}
 }
 
 impl<'a> KeyVacantEntry<'a> for serde_json::map::VacantEntry<'a> {
 	#[inline(always)]
-	fn key(&self) -> &Self::K {
+	fn key(&self) -> &String {
 		serde_json::map::VacantEntry::key(self)
 	}
 
 	#[inline(always)]
-	fn into_key(self) -> Self::K {
+	fn into_key(self) -> String {
 		self.key().clone() // serde::json doesn't implement into_key so we use this instead
 	}
 }
