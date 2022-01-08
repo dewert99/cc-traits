@@ -1,5 +1,5 @@
-use std::collections::vec_deque::VecDeque;
 use cc_traits::{Back, Collection, PushBack};
+use std::collections::vec_deque::VecDeque;
 
 /// Ordered stack.
 pub struct Ordered<S> {

@@ -1,4 +1,8 @@
-use crate::{Clear, Collection, CollectionMut, CollectionRef, Entry, EntryApi, Get, GetKeyValue, GetMut, Keyed, KeyedRef, KeyVacantEntry, Len, MapInsert, MapIter, MapIterMut, OccupiedEntry, Remove, VacantEntry};
+use crate::{
+	AssociatedCollection, Clear, Collection, CollectionMut, CollectionRef, Entry, EntryApi, Get,
+	GetKeyValue, GetMut, KeyVacantEntry, Keyed, KeyedRef, Len, MapInsert, MapIter, MapIterMut,
+	OccupiedEntry, Remove, VacantEntry,
+};
 use std::{borrow::Borrow, cmp::Ord, hash::Hash};
 
 impl Collection for serde_json::Map<String, serde_json::Value> {
@@ -118,65 +122,67 @@ impl Clear for serde_json::Map<String, serde_json::Value> {
 	}
 }
 
-impl<'a> OccupiedEntry<'a> for serde_json::map::OccupiedEntry<'a> {
-	type K = String;
-	type V = serde_json::Value;
+impl<'a> AssociatedCollection for serde_json::map::OccupiedEntry<'a> {
+	type Owner = serde_json::Map<String, serde_json::Value>;
+}
 
+impl<'a> OccupiedEntry<'a> for serde_json::map::OccupiedEntry<'a> {
 	#[inline(always)]
-	fn key(&self) -> &Self::K {
+	fn key(&self) -> &Self::Key {
 		serde_json::map::OccupiedEntry::key(self)
 	}
 
 	#[inline(always)]
-	fn remove_entry(self) -> (Self::K, Self::V) {
+	fn remove_entry(self) -> (Self::Key, Self::Item) {
 		let key = self.key().clone();
 		(key, self.remove()) // serde::json doesn't implement remove_entry so we use this instead
 	}
 
 	#[inline(always)]
-	fn get(&self) -> &Self::V {
+	fn get(&self) -> &Self::Item {
 		serde_json::map::OccupiedEntry::get(self)
 	}
 
 	#[inline(always)]
-	fn get_mut(&mut self) -> &mut Self::V {
+	fn get_mut(&mut self) -> &mut Self::Item {
 		serde_json::map::OccupiedEntry::get_mut(self)
 	}
 
 	#[inline(always)]
-	fn into_mut(self) -> &'a mut Self::V {
+	fn into_mut(self) -> &'a mut Self::Item {
 		serde_json::map::OccupiedEntry::into_mut(self)
 	}
 
 	#[inline(always)]
-	fn insert(&mut self, value: Self::V) -> Self::V {
+	fn insert(&mut self, value: Self::Item) -> Self::Item {
 		serde_json::map::OccupiedEntry::insert(self, value)
 	}
 
 	#[inline(always)]
-	fn remove(self) -> Self::V {
+	fn remove(self) -> Self::Item {
 		serde_json::map::OccupiedEntry::remove(self)
 	}
 }
 
-impl<'a> VacantEntry<'a> for serde_json::map::VacantEntry<'a> {
-	type K = String;
-	type V = serde_json::Value;
+impl<'a> AssociatedCollection for serde_json::map::VacantEntry<'a> {
+	type Owner = serde_json::Map<String, serde_json::Value>;
+}
 
+impl<'a> VacantEntry<'a> for serde_json::map::VacantEntry<'a> {
 	#[inline(always)]
-	fn insert(self, value: Self::V) -> &'a mut Self::V {
+	fn insert(self, value: Self::Item) -> &'a mut Self::Item {
 		serde_json::map::VacantEntry::insert(self, value)
 	}
 }
 
 impl<'a> KeyVacantEntry<'a> for serde_json::map::VacantEntry<'a> {
 	#[inline(always)]
-	fn key(&self) -> &Self::K {
+	fn key(&self) -> &Self::Key {
 		serde_json::map::VacantEntry::key(self)
 	}
 
 	#[inline(always)]
-	fn into_key(self) -> Self::K {
+	fn into_key(self) -> Self::Key {
 		self.key().clone() // serde::json doesn't implement into_key so we use this instead
 	}
 }

@@ -1,7 +1,7 @@
 use crate::{
-	Clear, Collection, CollectionMut, CollectionRef, Entry, EntryApi, Get, GetKeyValue, GetMut,
-	Iter, KeyVacantEntry, Keyed, KeyedRef, Len, MapInsert, MapIter, MapIterMut, OccupiedEntry,
-	Remove, VacantEntry,
+	AssociatedCollection, Clear, Collection, CollectionMut, CollectionRef, Entry, EntryApi, Get,
+	GetKeyValue, GetMut, Iter, KeyVacantEntry, Keyed, KeyedRef, Len, MapInsert, MapIter,
+	MapIterMut, OccupiedEntry, Remove, VacantEntry,
 };
 use std::{
 	borrow::Borrow,
@@ -151,63 +151,65 @@ impl<K, V> MapIterMut for BTreeMap<K, V> {
 	}
 }
 
-impl<'a, K: Ord, V> OccupiedEntry<'a> for btree_map::OccupiedEntry<'a, K, V> {
-	type K = K;
-	type V = V;
+impl<'a, K: Ord, V> AssociatedCollection for btree_map::OccupiedEntry<'a, K, V> {
+	type Owner = BTreeMap<K, V>;
+}
 
+impl<'a, K: Ord, V> OccupiedEntry<'a> for btree_map::OccupiedEntry<'a, K, V> {
 	#[inline(always)]
-	fn key(&self) -> &Self::K {
+	fn key(&self) -> &Self::Key {
 		btree_map::OccupiedEntry::key(self)
 	}
 
 	#[inline(always)]
-	fn remove_entry(self) -> (Self::K, Self::V) {
+	fn remove_entry(self) -> (Self::Key, Self::Item) {
 		btree_map::OccupiedEntry::remove_entry(self)
 	}
 
 	#[inline(always)]
-	fn get(&self) -> &Self::V {
+	fn get(&self) -> &Self::Item {
 		btree_map::OccupiedEntry::get(self)
 	}
 
 	#[inline(always)]
-	fn get_mut(&mut self) -> &mut Self::V {
+	fn get_mut(&mut self) -> &mut Self::Item {
 		btree_map::OccupiedEntry::get_mut(self)
 	}
 
 	#[inline(always)]
-	fn into_mut(self) -> &'a mut Self::V {
+	fn into_mut(self) -> &'a mut Self::Item {
 		btree_map::OccupiedEntry::into_mut(self)
 	}
 
 	#[inline(always)]
-	fn insert(&mut self, value: Self::V) -> Self::V {
+	fn insert(&mut self, value: Self::Item) -> Self::Item {
 		btree_map::OccupiedEntry::insert(self, value)
 	}
 
 	#[inline(always)]
-	fn remove(self) -> Self::V {
+	fn remove(self) -> Self::Item {
 		btree_map::OccupiedEntry::remove(self)
 	}
 }
 
-impl<'a, K: Ord, V> VacantEntry<'a> for btree_map::VacantEntry<'a, K, V> {
-	type K = K;
-	type V = V;
+impl<'a, K: Ord, V> AssociatedCollection for btree_map::VacantEntry<'a, K, V> {
+	type Owner = BTreeMap<K, V>;
+}
 
+impl<'a, K: Ord, V> VacantEntry<'a> for btree_map::VacantEntry<'a, K, V> {
 	#[inline(always)]
-	fn insert(self, value: Self::V) -> &'a mut Self::V {
+	fn insert(self, value: Self::Item) -> &'a mut Self::Item {
 		btree_map::VacantEntry::insert(self, value)
 	}
 }
 
 impl<'a, K: Ord, V> KeyVacantEntry<'a> for btree_map::VacantEntry<'a, K, V> {
 	#[inline(always)]
-	fn into_key(self) -> Self::K {
+	fn into_key(self) -> Self::Key {
 		btree_map::VacantEntry::into_key(self)
 	}
 	#[inline(always)]
-	fn key(&self) -> &Self::K {
+	fn key(&self) -> &Self::Key {
 		btree_map::VacantEntry::key(self)
 	}
 }

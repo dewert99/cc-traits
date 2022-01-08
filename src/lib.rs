@@ -113,8 +113,8 @@ mod alias;
 
 pub mod entry_api;
 
-use std::borrow::Borrow;
 use entry_api::*;
+use std::borrow::Borrow;
 
 #[cfg(feature = "nightly")]
 pub use alias::*;
@@ -345,10 +345,10 @@ pub trait MapInsert<K>: Collection {
 
 /// Mutable map that supports the entry api
 pub trait EntryApi: Keyed {
-	type Occ<'a>: OccupiedEntry<'a, K = Self::Key, V = Self::Item>
+	type Occ<'a>: OccupiedEntry<'a, Key = Self::Key, Item = Self::Item>
 	where
 		Self: 'a;
-	type Vac<'a>: KeyVacantEntry<'a, K = Self::Key, V = Self::Item>
+	type Vac<'a>: KeyVacantEntry<'a, Key = Self::Key, Item = Self::Item>
 	where
 		Self: 'a;
 
@@ -377,14 +377,15 @@ pub trait EntryApi: Keyed {
 	fn entry(&mut self, key: Self::Key) -> Entry<Self::Occ<'_>, Self::Vac<'_>>;
 }
 
-
 pub trait EntryRefApi<Q: ?Sized>: Keyed
-where Self::Key: Borrow<Q> {
-	type Occ<'a>: OccupiedEntry<'a, K = Self::Key, V = Self::Item>
+where
+	Self::Key: Borrow<Q>,
+{
+	type Occ<'a>: OccupiedEntry<'a, Key = Self::Key, Item = Self::Item>
 	where
 		Self: 'a,
 		Q: 'a;
-	type Vac<'a: 'b, 'b>: VacantEntry<'a, K = Self::Key, V = Self::Item>
+	type Vac<'a: 'b, 'b>: VacantEntry<'a, Key = Self::Key, Item = Self::Item>
 	where
 		Self: 'a,
 		Q: 'a + 'b;
@@ -423,7 +424,8 @@ where Self::Key: Borrow<Q> {
 	/// ```
 	/// Note: implementing this trait for hash map requires the `raw_entry` feature since it makes use of the `hash_raw_entry` nightly feature
 	fn entry_ref<'a: 'b, 'b>(&'a mut self, key: &'b Q) -> Entry<Self::Occ<'a>, Self::Vac<'a, 'b>>
-	where Q: 'a+'b;
+	where
+		Q: 'a + 'b;
 }
 
 /// Mutable collection where new elements can be pushed on the front.

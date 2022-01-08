@@ -1,8 +1,29 @@
+use crate::{Collection, Keyed};
+use std::fmt;
+use std::fmt::Debug;
+use Entry::*;
+
+pub trait AssociatedCollection {
+	type Owner;
+}
+
+impl<S: AssociatedCollection> Collection for S
+where
+	S::Owner: Collection,
+{
+	type Item = <S::Owner as Collection>::Item;
+}
+
+impl<S: AssociatedCollection> Keyed for S
+where
+	S::Owner: Keyed,
+{
+	type Key = <S::Owner as Keyed>::Key;
+}
+
 /// A view into an occupied entry.
 /// It is part of the [`Entry`] enum.
-pub trait OccupiedEntry<'a>: Sized {
-	type K;
-	type V;
+pub trait OccupiedEntry<'a>: Keyed + Sized {
 	/// Gets a reference to the key in the entry.
 	///
 	/// # Examples
@@ -16,7 +37,7 @@ pub trait OccupiedEntry<'a>: Sized {
 	/// map.entry("poneyland").or_insert(12);
 	/// assert_eq!(map.entry("poneyland").key(), &"poneyland");
 	/// ```
-	fn key(&self) -> &Self::K;
+	fn key(&self) -> &Self::Key;
 
 	/// Take the ownership of the key and value from the map.
 	///
@@ -37,7 +58,7 @@ pub trait OccupiedEntry<'a>: Sized {
 	///
 	/// assert_eq!(map.contains_key("poneyland"), false);
 	/// ```
-	fn remove_entry(self) -> (Self::K, Self::V);
+	fn remove_entry(self) -> (Self::Key, Self::Item);
 
 	/// Gets a reference to the value in the entry.
 	///
@@ -55,7 +76,7 @@ pub trait OccupiedEntry<'a>: Sized {
 	///     assert_eq!(o.get(), &12);
 	/// };
 	/// ```
-	fn get(&self) -> &Self::V;
+	fn get(&self) -> &Self::Item;
 
 	/// Gets a mutable reference to the value in the entry.
 	///
@@ -86,7 +107,7 @@ pub trait OccupiedEntry<'a>: Sized {
 	///
 	/// assert_eq!(map["poneyland"], 24);
 	/// ```
-	fn get_mut(&mut self) -> &mut Self::V;
+	fn get_mut(&mut self) -> &mut Self::Item;
 
 	/// Converts the `OccupiedEntry` into a mutable reference to the value in the entry
 	/// with a lifetime bound to the map itself.
@@ -113,7 +134,7 @@ pub trait OccupiedEntry<'a>: Sized {
 	///
 	/// assert_eq!(map["poneyland"], 22);
 	/// ```
-	fn into_mut(self) -> &'a mut Self::V;
+	fn into_mut(self) -> &'a mut Self::Item;
 
 	/// Sets the value of the entry, and returns the entry's old value.
 	///
@@ -134,7 +155,7 @@ pub trait OccupiedEntry<'a>: Sized {
 	///
 	/// assert_eq!(map["poneyland"], 15);
 	/// ```
-	fn insert(&mut self, value: Self::V) -> Self::V;
+	fn insert(&mut self, value: Self::Item) -> Self::Item;
 
 	/// Takes the value out of the entry, and returns it.
 	///
@@ -154,7 +175,7 @@ pub trait OccupiedEntry<'a>: Sized {
 	///
 	/// assert_eq!(map.contains_key("poneyland"), false);
 	/// ```
-	fn remove(self) -> Self::V {
+	fn remove(self) -> Self::Item {
 		self.remove_entry().1
 	}
 }
@@ -162,9 +183,7 @@ pub trait OccupiedEntry<'a>: Sized {
 /// A view into a vacant entry.
 /// It is part of the [`Entry`] enum.
 /// See also [`KeyVacantEntry`] for entries that own there key
-pub trait VacantEntry<'a>: Sized {
-	type K;
-	type V;
+pub trait VacantEntry<'a>: Keyed {
 	/// Sets the value of the entry with the `VacantEntry`'s key,
 	/// and returns a mutable reference to it.
 	///
@@ -183,7 +202,7 @@ pub trait VacantEntry<'a>: Sized {
 	/// }
 	/// assert_eq!(map["poneyland"], 37);
 	/// ```
-	fn insert(self, value: Self::V) -> &'a mut Self::V;
+	fn insert(self, value: Self::Item) -> &'a mut Self::Item;
 }
 
 pub trait KeyVacantEntry<'a>: VacantEntry<'a> {
@@ -200,7 +219,7 @@ pub trait KeyVacantEntry<'a>: VacantEntry<'a> {
 	/// let mut map = make_map();
 	/// assert_eq!(map.entry("poneyland").key(), &"poneyland");
 	/// ```
-	fn key(&self) -> &Self::K;
+	fn key(&self) -> &Self::Key;
 
 	/// Take ownership of the key.
 	///
@@ -217,9 +236,8 @@ pub trait KeyVacantEntry<'a>: VacantEntry<'a> {
 	///     v.into_key();
 	/// };
 	/// ```
-	fn into_key(self) -> Self::K;
+	fn into_key(self) -> Self::Key;
 }
-
 
 ///A view into a single entry in a map, which may either be vacant or occupied.
 ///
@@ -245,13 +263,10 @@ pub enum Entry<Occ, Vac> {
 	Vacant(Vac),
 }
 
-use std::fmt;
-use std::fmt::Debug;
-use Entry::*;
 impl<'a, Occ, Vac> Entry<Occ, Vac>
 where
 	Occ: OccupiedEntry<'a>,
-	Vac: VacantEntry<'a, K = Occ::K, V = Occ::V>,
+	Vac: VacantEntry<'a, Key = Occ::Key, Item = Occ::Item>,
 {
 	/// Ensures a value is in the entry by inserting the default if empty, and returns
 	/// a mutable reference to the value in the entry.
@@ -273,7 +288,7 @@ where
 	/// assert_eq!(map["poneyland"], 6);
 	/// ```
 	#[inline]
-	pub fn or_insert(self, default: Occ::V) -> &'a mut Occ::V {
+	pub fn or_insert(self, default: Occ::Item) -> &'a mut Occ::Item {
 		match self {
 			Occupied(entry) => entry.into_mut(),
 			Vacant(entry) => entry.insert(default),
@@ -299,7 +314,7 @@ where
 	/// assert_eq!(map["poneyland"], "hoho".to_string());
 	/// ```
 	#[inline]
-	pub fn or_insert_with<F: FnOnce() -> Occ::V>(self, default: F) -> &'a mut Occ::V {
+	pub fn or_insert_with<F: FnOnce() -> Occ::Item>(self, default: F) -> &'a mut Occ::Item {
 		match self {
 			Occupied(entry) => entry.into_mut(),
 			Vacant(entry) => entry.insert(default()),
@@ -332,7 +347,7 @@ where
 	#[inline]
 	pub fn and_modify<F>(self, f: F) -> Self
 	where
-		F: FnOnce(&mut Occ::V),
+		F: FnOnce(&mut Occ::Item),
 	{
 		match self {
 			Occupied(mut entry) => {
@@ -347,7 +362,7 @@ where
 impl<'a, Occ, Vac> Entry<Occ, Vac>
 where
 	Occ: OccupiedEntry<'a>,
-	Vac: KeyVacantEntry<'a, K = Occ::K, V = Occ::V>,
+	Vac: KeyVacantEntry<'a, Key = Occ::Key, Item = Occ::Item>,
 {
 	/// Returns a reference to this entry's key.
 	///
@@ -362,7 +377,7 @@ where
 	/// assert_eq!(map.entry("poneyland").key(), &"poneyland");
 	/// ```
 	#[inline]
-	pub fn key(&self) -> &Occ::K {
+	pub fn key(&self) -> &Occ::Key {
 		match *self {
 			Occupied(ref entry) => entry.key(),
 			Vacant(ref entry) => entry.key(),
@@ -391,7 +406,10 @@ where
 	///
 	/// assert_eq!(map["poneyland"], 9);
 	/// ```
-	pub fn or_insert_with_key<F: FnOnce(&Occ::K) -> Occ::V>(self, default: F) -> &'a mut Occ::V {
+	pub fn or_insert_with_key<F: FnOnce(&Occ::Key) -> Occ::Item>(
+		self,
+		default: F,
+	) -> &'a mut Occ::Item {
 		match self {
 			Occupied(entry) => entry.into_mut(),
 			Vacant(entry) => {
@@ -405,8 +423,8 @@ where
 impl<'a, Occ, Vac> Entry<Occ, Vac>
 where
 	Occ: OccupiedEntry<'a>,
-	Vac: VacantEntry<'a, K = Occ::K, V = Occ::V>,
-	Occ::V: Default,
+	Vac: VacantEntry<'a, Key = Occ::Key, Item = Occ::Item>,
+	Occ::Item: Default,
 {
 	/// Ensures a value is in the entry by inserting the default value if empty,
 	/// and returns a mutable reference to the value in the entry.
@@ -427,7 +445,7 @@ where
 	/// # }
 	/// ```
 	#[inline]
-	pub fn or_default(self) -> &'a mut Occ::V {
+	pub fn or_default(self) -> &'a mut Occ::Item {
 		match self {
 			Occupied(entry) => entry.into_mut(),
 			Vacant(entry) => entry.insert(Default::default()),
@@ -438,7 +456,7 @@ where
 impl<'a, Occ, Vac> Debug for Entry<Occ, Vac>
 where
 	Occ: OccupiedEntry<'a> + Debug,
-	Vac: VacantEntry<'a, K = Occ::K, V = Occ::V> + Debug,
+	Vac: VacantEntry<'a, Key = Occ::Key, Item = Occ::Item> + Debug,
 {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match *self {
@@ -451,43 +469,47 @@ where
 #[cfg(feature = "raw_entry")]
 pub struct RefOccupiedEntry<Occ>(pub(crate) Occ);
 
+impl<'a, Occ: OccupiedEntry<'a>> AssociatedCollection for RefOccupiedEntry<Occ> {
+	type Owner = Occ;
+}
+
 #[cfg(feature = "raw_entry")]
 impl<'a, Occ: OccupiedEntry<'a>> OccupiedEntry<'a> for RefOccupiedEntry<Occ> {
-	type K = Occ::K;
-	type V = Occ::V;
-
-	fn key(&self) -> &Self::K {
+	fn key(&self) -> &Self::Key {
 		self.0.key()
 	}
 
-	fn remove_entry(self) -> (Self::K, Self::V) {
+	fn remove_entry(self) -> (Self::Key, Self::Item) {
 		self.0.remove_entry()
 	}
 
-	fn get(&self) -> &Self::V {
+	fn get(&self) -> &Self::Item {
 		self.0.get()
 	}
 
-	fn get_mut(&mut self) -> &mut Self::V {
+	fn get_mut(&mut self) -> &mut Self::Item {
 		self.0.get_mut()
 	}
 
-	fn into_mut(self) -> &'a mut Self::V {
+	fn into_mut(self) -> &'a mut Self::Item {
 		self.0.into_mut()
 	}
 
-	fn insert(&mut self, value: Self::V) -> Self::V {
+	fn insert(&mut self, value: Self::Item) -> Self::Item {
 		self.0.insert(value)
 	}
 
-	fn remove(self) -> Self::V {
+	fn remove(self) -> Self::Item {
 		self.0.remove()
 	}
 }
 
 #[cfg(feature = "raw_entry")]
 impl<'a, Occ: OccupiedEntry<'a>> Debug for RefOccupiedEntry<Occ>
-where Occ::K: Debug, Occ::V: Debug {
+where
+	Occ::Key: Debug,
+	Occ::Item: Debug,
+{
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("RefOccupiedEntry")
 			.field("key", self.key())
@@ -497,10 +519,8 @@ where Occ::K: Debug, Occ::V: Debug {
 }
 
 #[cfg(feature = "raw_entry")]
-pub trait RawVacantEntry<'a>: Sized {
-	type K: 'a;
-	type V: 'a;
-	fn insert(self, key: Self::K, value: Self::V) -> (&'a mut Self::K, &'a mut Self::V);
+pub trait RawVacantEntry<'a>: Sized + Keyed {
+	fn insert(self, key: Self::Key, value: Self::Item) -> (&'a mut Self::Key, &'a mut Self::Item);
 }
 
 #[cfg(feature = "raw_entry")]
@@ -509,20 +529,25 @@ pub struct RefVacantEntry<Q, Vac> {
 	pub(crate) raw: Vac,
 }
 
-#[cfg(feature = "raw_entry")]
-impl<'a, 'b, Q: ToOwned<Owned = Vac::K> + ?Sized, Vac: RawVacantEntry<'a>> VacantEntry<'a>
+impl<'a, 'b, Q: ?Sized, Vac: RawVacantEntry<'a>> AssociatedCollection
 	for RefVacantEntry<&'b Q, Vac>
 {
-	type K = Vac::K;
-	type V = Vac::V;
+	type Owner = Vac;
+}
 
-	fn insert(self, value: Self::V) -> &'a mut Self::V {
+#[cfg(feature = "raw_entry")]
+impl<'a, 'b, Q: ToOwned<Owned = Vac::Key> + ?Sized, Vac: RawVacantEntry<'a>> VacantEntry<'a>
+	for RefVacantEntry<&'b Q, Vac>
+where
+	Vac::Key: 'a,
+{
+	fn insert(self, value: Self::Item) -> &'a mut Self::Item {
 		self.raw.insert(self.key.to_owned(), value).1
 	}
 }
 
 #[cfg(feature = "raw_entry")]
-impl<'a, 'b, Q: ToOwned<Owned = Vac::K> + Debug, Vac: RawVacantEntry<'a>> Debug
+impl<'a, 'b, Q: ToOwned<Owned = Vac::Key> + Debug, Vac: RawVacantEntry<'a>> Debug
 	for RefVacantEntry<&'b Q, Vac>
 {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
