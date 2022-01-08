@@ -211,17 +211,17 @@ impl<'a, K: Ord, V> KeyVacantEntry<'a> for btree_map::VacantEntry<'a, K, V> {
 }
 
 impl<K: Ord, V> EntryApi for BTreeMap<K, V> {
-	type Occ<'a>
+	type Occupied<'a>
 	where
 		Self: 'a,
 	= btree_map::OccupiedEntry<'a, K, V>;
-	type Vac<'a>
+	type Vacant<'a>
 	where
 		Self: 'a,
 	= btree_map::VacantEntry<'a, K, V>;
 
 	#[inline(always)]
-	fn entry(&mut self, key: Self::Key) -> Entry<Self::Occ<'_>, Self::Vac<'_>> {
+	fn entry(&mut self, key: Self::Key) -> Entry<Self::Occupied<'_>, Self::Vacant<'_>> {
 		match BTreeMap::entry(self, key) {
 			btree_map::Entry::Occupied(o) => Entry::Occupied(o),
 			btree_map::Entry::Vacant(v) => Entry::Vacant(v),

@@ -113,7 +113,6 @@ mod alias;
 
 pub mod entry_api;
 
-use std::borrow::Borrow;
 use entry_api::*;
 
 #[cfg(feature = "nightly")]
@@ -341,89 +340,6 @@ pub trait MapInsert<K>: Collection {
 
 	/// Insert a new key-value pair in the collection.
 	fn insert(&mut self, key: K, value: Self::Item) -> Self::Output;
-}
-
-/// Mutable map that supports the entry api
-pub trait EntryApi: CollectionMut + CollectionRef + KeyedRef {
-	type Occ<'a>: OccupiedEntry<'a, Owner=Self>
-	where
-		Self: 'a;
-	type Vac<'a>: KeyVacantEntry<'a, Owner=Self>
-	where
-		Self: 'a;
-
-	/// Gets the given key's corresponding entry in the map for in-place manipulation.
-	///
-	/// # Examples
-	///
-	/// ```
-	/// use std::collections::HashMap;
-	/// use std::ops::Index;
-	/// use cc_traits::{EntryApi, entry_api::*, Get};
-	///
-	/// fn make_map() -> impl EntryApi<Key=char,Item=u32> + Index<&'static char, Output=u32> + Get<&'static char> { HashMap::new() }
-	/// let mut letters = make_map();
-	///
-	/// for ch in "a short treatise on fungi".chars() {
-	///     let mut counter = letters.entry(ch).or_insert(0);
-	///     *counter += 1;
-	/// }
-	///
-	/// assert_eq!(letters[&'s'], 2);
-	/// assert_eq!(letters[&'t'], 3);
-	/// assert_eq!(letters[&'u'], 1);
-	/// assert!(!letters.contains_key(&'y'));
-	/// ```
-	fn entry(&mut self, key: Self::Key) -> Entry<Self::Occ<'_>, Self::Vac<'_>>;
-}
-
-
-pub trait EntryRefApi<Q: ?Sized>: CollectionMut + CollectionRef + KeyedRef
-where Self::Key: Borrow<Q> {
-	type Occ<'a>: OccupiedEntry<'a, Owner=Self>
-	where
-		Self: 'a,
-		Q: 'a;
-	type Vac<'a>: VacantEntry<'a, Owner=Self>
-	where
-		Self: 'a,
-		Q: 'a;
-
-	/// Gets the given key's corresponding entry in the map for in-place manipulation.
-	///
-	/// # Examples
-	///
-	/// ```
-	/// use std::collections::HashMap;
-	/// use std::ops::Index;
-	/// use cc_traits::{EntryRefApi, entry_api::*, Get};
-	///
-	/// fn make_map() -> impl EntryRefApi<str, Key=String,Item=u32> + Index<&'static str, Output=u32> + Get<&'static str> { HashMap::new() }
-	/// let mut words = make_map();
-	///
-	/// for s in "foo bar bar".split(' ') {
-	///     let mut counter = words.entry_ref(s).or_insert(0);
-	///     *counter += 1;
-	/// }
-	///
-	/// assert_eq!(words["bar"], 2);
-	/// assert_eq!(words["foo"], 1);
-	/// assert!(!words.contains_key("baz"));
-	/// ```
-	///
-	/// ```compile_fail
-	/// use std::collections::HashMap;
-	/// use cc_traits::{EntryRefApi, entry_api::*};
-	///
-	/// fn make_map() -> impl EntryRefApi<String, Key=String, Item=String>{ HashMap::new() }
-	///
-	/// let mut test = make_map();
-	/// let s = "hello world".to_string();
-	/// test.entry_ref(&s).or_insert(s); // the reference to s is still required so it can't be moved to insert
-	/// ```
-	/// Note: implementing this trait for hash map requires the `raw_entry` feature since it makes use of the `hash_raw_entry` nightly feature
-	fn entry_ref<'a>(&'a mut self, key: &'a Q) -> Entry<Self::Occ<'a>, Self::Vac<'a>>
-	where Q: 'a;
 }
 
 /// Mutable collection where new elements can be pushed on the front.
