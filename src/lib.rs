@@ -344,11 +344,11 @@ pub trait MapInsert<K>: Collection {
 }
 
 /// Mutable map that supports the entry api
-pub trait EntryApi: Keyed {
-	type Occ<'a>: OccupiedEntry<'a, Key = Self::Key, Item = Self::Item>
+pub trait EntryApi: KeyedRef + CollectionRef + CollectionMut {
+	type Occ<'a>: OccupiedEntry<'a, Key = Self::Key, Item = Self::Item, KeyRef<'a> = Self::KeyRef<'a>, ItemRef<'a> = Self::ItemRef<'a>, ItemMut<'a> = Self::ItemMut<'a>>
 	where
 		Self: 'a;
-	type Vac<'a>: KeyVacantEntry<'a, Key = Self::Key, Item = Self::Item>
+	type Vac<'a>: KeyVacantEntry<'a, Key = Self::Key, Item = Self::Item, KeyRef<'a> = Self::KeyRef<'a>, ItemRef<'a> = Self::ItemRef<'a>, ItemMut<'a> = Self::ItemMut<'a>>
 	where
 		Self: 'a;
 
@@ -365,7 +365,7 @@ pub trait EntryApi: Keyed {
 	/// let mut letters = make_map();
 	///
 	/// for ch in "a short treatise on fungi".chars() {
-	///     let counter = letters.entry(ch).or_insert(0);
+	///     let mut counter = letters.entry(ch).or_insert(0);
 	///     *counter += 1;
 	/// }
 	///
@@ -377,18 +377,18 @@ pub trait EntryApi: Keyed {
 	fn entry(&mut self, key: Self::Key) -> Entry<Self::Occ<'_>, Self::Vac<'_>>;
 }
 
-pub trait EntryRefApi<Q: ?Sized>: Keyed
+pub trait EntryRefApi<Q: ?Sized>: KeyedRef + CollectionRef + CollectionMut
 where
 	Self::Key: Borrow<Q>,
 {
-	type Occ<'a>: OccupiedEntry<'a, Key = Self::Key, Item = Self::Item>
+	type Occ<'a>: OccupiedEntry<'a, Key = Self::Key, Item = Self::Item, KeyRef<'a> = Self::KeyRef<'a>, ItemRef<'a> = Self::ItemRef<'a>, ItemMut<'a> = Self::ItemMut<'a>>
 	where
 		Self: 'a,
 		Q: 'a;
-	type Vac<'a: 'b, 'b>: VacantEntry<'a, Key = Self::Key, Item = Self::Item>
+	type Vac<'a>: VacantEntry<'a, Key = Self::Key, Item = Self::Item, KeyRef<'a> = Self::KeyRef<'a>, ItemRef<'a> = Self::ItemRef<'a>, ItemMut<'a> = Self::ItemMut<'a>>
 	where
 		Self: 'a,
-		Q: 'a + 'b;
+		Q: 'a;
 
 	/// Gets the given key's corresponding entry in the map for in-place manipulation.
 	///
@@ -403,7 +403,7 @@ where
 	/// let mut words = make_map();
 	///
 	/// for s in "foo bar bar".split(' ') {
-	///     let counter = words.entry_ref(s).or_insert(0);
+	///     let mut counter = words.entry_ref(s).or_insert(0);
 	///     *counter += 1;
 	/// }
 	///
@@ -423,9 +423,7 @@ where
 	/// test.entry_ref(&s).or_insert(s); // the reference to s is still required so it can't be moved to insert
 	/// ```
 	/// Note: implementing this trait for hash map requires the `raw_entry` feature since it makes use of the `hash_raw_entry` nightly feature
-	fn entry_ref<'a: 'b, 'b>(&'a mut self, key: &'b Q) -> Entry<Self::Occ<'a>, Self::Vac<'a, 'b>>
-	where
-		Q: 'a + 'b;
+	fn entry_ref<'a>(&'a mut self, key: &'a Q) -> Entry<Self::Occ<'a>, Self::Vac<'a>>;
 }
 
 /// Mutable collection where new elements can be pushed on the front.

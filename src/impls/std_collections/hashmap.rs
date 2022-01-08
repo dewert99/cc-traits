@@ -300,15 +300,13 @@ where
 		Self: 'a,
 		Q: 'a,
 	= crate::RefOccupiedEntry<hash_map::RawOccupiedEntryMut<'a, K, V, S>>;
-	type Vac<'a: 'b, 'b>
+	type Vac<'a>
 	where
 		Self: 'a,
-		Q: 'a + 'b,
-	= crate::RefVacantEntry<&'b Q, hash_map::RawVacantEntryMut<'a, K, V, S>>;
+		Q: 'a,
+	= crate::RefVacantEntry<&'a Q, hash_map::RawVacantEntryMut<'a, K, V, S>>;
 
-	fn entry_ref<'a: 'b, 'b>(&'a mut self, key: &'b Q) -> Entry<Self::Occ<'a>, Self::Vac<'a, 'b>>
-	where
-		Q: 'a + 'b,
+	fn entry_ref<'a>(&'a mut self, key: &'a Q) -> Entry<Self::Occ<'a>, Self::Vac<'a>>
 	{
 		let raw = self.raw_entry_mut();
 		match raw.from_key(key) {
