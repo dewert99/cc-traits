@@ -182,7 +182,7 @@ impl EntryApi for serde_json::Map<String, serde_json::Value> {
 	type Vac<'a> = serde_json::map::VacantEntry<'a>;
 
 	#[inline(always)]
-	fn entry(&mut self, key: Self::Key) -> Entry<Self::Occ<'_>, Self::Vac<'_>> {
+	fn entry(&mut self, key: Self::Key) -> Entry<'_, Self> {
 		match serde_json::Map::entry(self, key) {
 			serde_json::map::Entry::Occupied(o) => Entry::Occupied(o),
 			serde_json::map::Entry::Vacant(v) => Entry::Vacant(v),

@@ -219,7 +219,7 @@ impl<K: Ord, V> EntryApi for BTreeMap<K, V> {
 	= btree_map::VacantEntry<'a, K, V>;
 
 	#[inline(always)]
-	fn entry(&mut self, key: Self::Key) -> Entry<Self::Occ<'_>, Self::Vac<'_>> {
+	fn entry(&mut self, key: Self::Key) -> Entry<'_, Self> {
 		match BTreeMap::entry(self, key) {
 			btree_map::Entry::Occupied(o) => Entry::Occupied(o),
 			btree_map::Entry::Vacant(v) => Entry::Vacant(v),
