@@ -1,11 +1,7 @@
-use crate::{
-	Clear, Collection, CollectionMut, CollectionRef, Entry, EntryApi, Get, GetKeyValue, GetMut,
-	Iter, KeyVacantEntry, Keyed, KeyedRef, Len, MapInsert, MapIter, MapIterMut, OccupiedEntry,
-	Remove, VacantEntry,
-};
+use crate::{Clear, Collection, CollectionMut, CollectionRef, Entry, EntryApi, Get, GetKeyValue, GetMut, Iter, Keyed, KeyedRef, Len, MapInsert, MapIter, MapIterMut, OccupiedEntry, Remove, VacantEntry, EntryTypes, EntryFlag};
 use std::{
 	borrow::Borrow,
-	collections::{btree_map, BTreeMap},
+	collections::{btree_map, btree_map::BTreeMap},
 };
 
 impl<K, V> Collection for BTreeMap<K, V> {
@@ -195,9 +191,6 @@ impl<'a, K: Ord, V> VacantEntry<'a, BTreeMap<K, V>> for btree_map::VacantEntry<'
 	fn insert(self, value: V) -> &'a mut V {
 		btree_map::VacantEntry::insert(self, value)
 	}
-}
-
-impl<'a, K: Ord, V> KeyVacantEntry<'a, BTreeMap<K, V>> for btree_map::VacantEntry<'a, K, V> {
 	#[inline(always)]
 	fn key(&self) -> &K {
 		btree_map::VacantEntry::key(self)
@@ -208,15 +201,18 @@ impl<'a, K: Ord, V> KeyVacantEntry<'a, BTreeMap<K, V>> for btree_map::VacantEntr
 	}
 }
 
-impl<K: Ord, V> EntryApi for BTreeMap<K, V> {
+impl<K: Ord, V> EntryTypes<EntryFlag> for BTreeMap<K, V> {
 	type Occ<'a>
-	where
-		Self: 'a,
+		where
+			Self: 'a,
 	= btree_map::OccupiedEntry<'a, K, V>;
 	type Vac<'a>
-	where
-		Self: 'a,
+		where
+			Self: 'a,
 	= btree_map::VacantEntry<'a, K, V>;
+}
+
+impl<K: Ord, V> EntryApi for BTreeMap<K, V> {
 
 	#[inline(always)]
 	fn entry(&mut self, key: Self::Key) -> Entry<'_, Self> {

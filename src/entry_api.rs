@@ -3,12 +3,12 @@ use std::fmt;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use Entry::*;
-use crate::EntryApi;
+use crate::{CollectionMut, CollectionRef, EntryFlag, EntryTypes, KeyedRef, SupportsKeyVacantEntry};
 
 
 /// A view into an occupied entry.
 /// It is part of the [`Entry`] enum.
-pub trait OccupiedEntry<'a, C: EntryApi + 'a + ?Sized>: Sized {
+pub trait OccupiedEntry<'a, C: CollectionMut + CollectionRef + KeyedRef + ?Sized>: Sized {
 	/// Gets a reference to the key in the entry.
 	///
 	/// # Examples
@@ -170,7 +170,7 @@ pub trait OccupiedEntry<'a, C: EntryApi + 'a + ?Sized>: Sized {
 /// A view into a vacant entry.
 /// It is part of the [`Entry`] enum.
 /// See also [`KeyVacantEntry`] for entries that own there key
-pub trait VacantEntry<'a, C: EntryApi + 'a + ?Sized>: Sized {
+pub trait VacantEntry<'a, C: CollectionMut + CollectionRef + KeyedRef + ?Sized, F=EntryFlag>: Sized {
 	/// Sets the value of the entry with the `VacantEntry`'s key,
 	/// and returns a mutable reference to it.
 	///
@@ -190,9 +190,7 @@ pub trait VacantEntry<'a, C: EntryApi + 'a + ?Sized>: Sized {
 	/// assert_eq!(map["poneyland"], 37);
 	/// ```
 	fn insert(self, value: C::Item) -> C::ItemMut<'a>;
-}
 
-pub trait KeyVacantEntry<'a, C: EntryApi + 'a + ?Sized>: VacantEntry<'a, C> {
 	/// Gets a reference to the key that would be used when inserting a value
 	/// through the `VacantEntry`.
 	///
@@ -207,7 +205,8 @@ pub trait KeyVacantEntry<'a, C: EntryApi + 'a + ?Sized>: VacantEntry<'a, C> {
 	/// let mut map = make_map();
 	/// assert!(map.entry("poneyland").key().eq("poneyland"));
 	/// ```
-	fn key(&self) -> C::KeyRef<'_>;
+	fn key(&self) -> C::KeyRef<'_>
+	where F: SupportsKeyVacantEntry;
 
 	/// Take ownership of the key.
 	///
@@ -224,8 +223,14 @@ pub trait KeyVacantEntry<'a, C: EntryApi + 'a + ?Sized>: VacantEntry<'a, C> {
 	///     v.into_key();
 	/// };
 	/// ```
-	fn into_key(self) -> C::Key;
+	fn into_key(self) -> C::Key
+		where F: SupportsKeyVacantEntry;
+
 }
+
+// pub trait KeyVacantEntry<'a, C: CollectionMut + CollectionRef + KeyedRef + ?Sized>: VacantEntry<'a, C> {
+//
+// }
 
 
 ///A view into a single entry in a map, which may either be vacant or occupied.
@@ -245,14 +250,14 @@ pub trait KeyVacantEntry<'a, C: EntryApi + 'a + ?Sized>: VacantEntry<'a, C> {
 /// 	let z: HashMapVacantEntry<_,_> = y;
 /// }
 /// ```
-pub enum Entry<'a, C: EntryApi + 'a + ?Sized> {
+pub enum Entry<'a, C: EntryTypes<T> + 'a + ?Sized, T:'a=EntryFlag> {
 	/// An occupied entry.
-	Occupied(C::Occ<'a>),
+	Occupied(<C as EntryTypes<T>>::Occ<'a>),
 	/// A vacant entry.
-	Vacant(C::Vac<'a>),
+	Vacant(<C as EntryTypes<T>>::Vac<'a>),
 }
 
-impl<'a, C: EntryApi + 'a + ?Sized> Entry<'a, C>
+impl<'a, C: EntryTypes<T> + 'a + ?Sized, T> Entry<'a, C, T>
 {
 	/// Ensures a value is in the entry by inserting the default if empty, and returns
 	/// a mutable reference to the value in the entry.
@@ -345,7 +350,7 @@ impl<'a, C: EntryApi + 'a + ?Sized> Entry<'a, C>
 	}
 }
 
-impl<'a, C: EntryApi + 'a + ?Sized> Entry<'a, C>
+impl<'a, C: EntryTypes<T> + 'a + ?Sized, T: SupportsKeyVacantEntry> Entry<'a, C, T>
 {
 	/// Returns a reference to this entry's key.
 	///
@@ -401,7 +406,7 @@ impl<'a, C: EntryApi + 'a + ?Sized> Entry<'a, C>
 	}
 }
 
-impl<'a, C: EntryApi + 'a + ?Sized> Entry<'a, C>
+impl<'a, C: EntryTypes<T> + 'a + ?Sized, T> Entry<'a, C, T>
 where
 	C::Item: Default,
 {
@@ -432,7 +437,7 @@ where
 	}
 }
 
-impl<'a, C: EntryApi + 'a + ?Sized> Debug for Entry<'a, C>
+impl<'a, C: EntryTypes<T> + 'a + ?Sized, T> Debug for Entry<'a, C, T>
 where C::Occ<'a>: Debug, C::Vac<'a>: Debug
 {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -446,40 +451,54 @@ where C::Occ<'a>: Debug, C::Vac<'a>: Debug
 #[cfg(feature = "raw_entry")]
 pub struct RefOccupiedEntry<Occ, C: ?Sized>(Occ, PhantomData<C>);
 
-#[cfg(feature = "raw_entry")]
-impl<'a, Occ: OccupiedEntry<'a, C>, C: EntryApi + 'a + ?Sized> OccupiedEntry<'a, C> for RefOccupiedEntry<Occ, C> {
+impl<Occ, C: ?Sized> RefOccupiedEntry<Occ, C> {
+	#[inline(always)]
+	pub fn new(x: Occ) -> Self {
+		RefOccupiedEntry(x, PhantomData::default())
+	}
+}
 
+#[cfg(feature = "raw_entry")]
+impl<'a, Occ: OccupiedEntry<'a, C>, C: CollectionMut + CollectionRef + KeyedRef + ?Sized> OccupiedEntry<'a, C> for RefOccupiedEntry<Occ, C> {
+
+	#[inline(always)]
 	fn key(&self) -> C::KeyRef<'_> {
 		self.0.key()
 	}
 
+	#[inline(always)]
 	fn remove_entry(self) -> (C::Key, C::Item) {
 		self.0.remove_entry()
 	}
 
+	#[inline(always)]
 	fn get(&self) -> C::ItemRef<'_> {
 		self.0.get()
 	}
 
+	#[inline(always)]
 	fn get_mut(&mut self) -> C::ItemMut<'_> {
 		self.0.get_mut()
 	}
 
+	#[inline(always)]
 	fn into_mut(self) -> C::ItemMut<'a> {
 		self.0.into_mut()
 	}
 
+	#[inline(always)]
 	fn insert(&mut self, value: C::Item) -> C::Item {
 		self.0.insert(value)
 	}
 
+	#[inline(always)]
 	fn remove(self) -> C::Item {
 		self.0.remove()
 	}
 }
 
 #[cfg(feature = "raw_entry")]
-impl<'a, Occ: OccupiedEntry<'a, C>, C: EntryApi + 'a + ?Sized> Debug for RefOccupiedEntry<Occ, C>
+impl<'a, Occ: OccupiedEntry<'a, C>, C: CollectionMut + CollectionRef + KeyedRef + ?Sized> Debug for RefOccupiedEntry<Occ, C>
 where C::Key: Debug, C::Item: Debug {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("RefOccupiedEntry")
@@ -490,7 +509,7 @@ where C::Key: Debug, C::Item: Debug {
 }
 
 #[cfg(feature = "raw_entry")]
-pub trait RawVacantEntry<'a, C: EntryApi + 'a + ?Sized>: Sized {
+pub trait RawVacantEntry<'a, C: CollectionMut + CollectionRef + KeyedRef + ?Sized>: Sized {
 	fn insert(self, key: C::Key, value: C::Item) -> (C::KeyRef<'a>, C::ItemMut<'a>);
 }
 
@@ -501,19 +520,36 @@ pub struct RefVacantEntry<Q, Vac, C: ?Sized> {
 	_phantom: PhantomData<C>
 }
 
-#[cfg(feature = "raw_entry")]
-impl<'a, Q: ?Sized, Vac: RawVacantEntry<'a, C>, C: EntryApi + 'a + ?Sized> VacantEntry<'a, C>
-	for RefVacantEntry<&'a Q, Vac, C>
-where Q: ToOwned<Owned=C::Key>
-{
-
-	fn insert(self, value: C::Item) -> C::ItemMut<'a> {
-		self.raw.insert(self.key.to_owned(), value).1
+impl<Q, Vac, C: ?Sized> RefVacantEntry<Q, Vac, C> {
+	#[inline(always)]
+	pub fn new(key: Q, raw: Vac) -> Self {
+		RefVacantEntry{key, raw, _phantom: PhantomData::default()}
 	}
 }
 
 #[cfg(feature = "raw_entry")]
-impl<'a, Q: Debug, Vac: RawVacantEntry<'a, C>, C: EntryApi + 'a + ?Sized> Debug
+impl<'a, Q: ?Sized, Vac: RawVacantEntry<'a, C>, C: CollectionMut + CollectionRef + KeyedRef + ?Sized> VacantEntry<'a, C, crate::EntryRefFlag<Q>>
+	for RefVacantEntry<&'a Q, Vac, C>
+where Q: ToOwned<Owned=C::Key>
+{
+
+	#[inline(always)]
+	fn insert(self, value: C::Item) -> C::ItemMut<'a> {
+		self.raw.insert(self.key.to_owned(), value).1
+	}
+
+	fn key(&self) -> C::KeyRef<'_> where crate::EntryRefFlag<Q>: SupportsKeyVacantEntry {
+		unreachable!()
+		// EntryRefFlag doesn't implement SupportsKeyVacantEntry
+	}
+
+	fn into_key(self) -> C::Key where crate::EntryRefFlag<Q>: SupportsKeyVacantEntry {
+		unreachable!()
+	}
+}
+
+#[cfg(feature = "raw_entry")]
+impl<'a, Q: Debug, Vac: RawVacantEntry<'a, C>, C: CollectionMut + CollectionRef + KeyedRef + ?Sized> Debug
 	for RefVacantEntry<&'a Q, Vac, C>
 where C::Key: Borrow<Q>
 {

@@ -1,4 +1,4 @@
-use crate::{Clear, Collection, CollectionMut, CollectionRef, Entry, EntryApi, Get, GetKeyValue, GetMut, Keyed, KeyedRef, KeyVacantEntry, Len, MapInsert, MapIter, MapIterMut, OccupiedEntry, Remove, VacantEntry};
+use crate::{Clear, Collection, CollectionMut, CollectionRef, Entry, EntryApi, EntryFlag, EntryTypes, Get, GetKeyValue, GetMut, Keyed, KeyedRef, Len, MapInsert, MapIter, MapIterMut, OccupiedEntry, Remove, VacantEntry};
 use std::{borrow::Borrow, cmp::Ord, hash::Hash};
 
 impl Collection for serde_json::Map<String, serde_json::Value> {
@@ -163,9 +163,7 @@ impl<'a> VacantEntry<'a, serde_json::Map<String, serde_json::Value>> for serde_j
 	fn insert(self, value: serde_json::Value) -> &'a mut serde_json::Value {
 		serde_json::map::VacantEntry::insert(self, value)
 	}
-}
 
-impl<'a> KeyVacantEntry<'a, serde_json::Map<String, serde_json::Value>> for serde_json::map::VacantEntry<'a> {
 	#[inline(always)]
 	fn key(&self) -> &String {
 		serde_json::map::VacantEntry::key(self)
@@ -177,10 +175,13 @@ impl<'a> KeyVacantEntry<'a, serde_json::Map<String, serde_json::Value>> for serd
 	}
 }
 
-impl EntryApi for serde_json::Map<String, serde_json::Value> {
+
+impl EntryTypes<EntryFlag> for serde_json::Map<String, serde_json::Value> {
 	type Occ<'a> = serde_json::map::OccupiedEntry<'a>;
 	type Vac<'a> = serde_json::map::VacantEntry<'a>;
+}
 
+impl EntryApi for serde_json::Map<String, serde_json::Value> {
 	#[inline(always)]
 	fn entry(&mut self, key: Self::Key) -> Entry<'_, Self> {
 		match serde_json::Map::entry(self, key) {
