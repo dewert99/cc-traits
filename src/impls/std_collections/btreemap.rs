@@ -202,11 +202,11 @@ impl<'a, K: Ord, V> VacantEntry<'a, BTreeMap<K, V>> for btree_map::VacantEntry<'
 }
 
 impl<K: Ord, V> EntryTypes<EntryFlag> for BTreeMap<K, V> {
-	type Occ<'a>
+	type Occupied<'a>
 		where
 			Self: 'a,
 	= btree_map::OccupiedEntry<'a, K, V>;
-	type Vac<'a>
+	type Vacant<'a>
 		where
 			Self: 'a,
 	= btree_map::VacantEntry<'a, K, V>;

@@ -204,11 +204,11 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher+'a> VacantEntry<'a, HashMap<K, V, S>> f
 
 
 impl<K: Hash + Eq, V, S: BuildHasher> EntryTypes<EntryFlag> for HashMap<K, V, S> {
-	type Occ<'a>
+	type Occupied<'a>
 		where
 			Self: 'a,
 	= hash_map::OccupiedEntry<'a, K, V>;
-	type Vac<'a>
+	type Vacant<'a>
 		where
 			Self: 'a,
 	= hash_map::VacantEntry<'a, K, V>;
@@ -275,14 +275,15 @@ impl<'a, K: Hash + Eq, V, S: BuildHasher> crate::RawVacantEntry<'a, HashMap<K, V
 	}
 }
 
+#[cfg(feature = "raw_entry")]
 impl<Q: Hash + Eq + ToOwned<Owned = K> + ?Sized, K: Hash + Eq, V, S: BuildHasher> EntryTypes<crate::EntryRefFlag<Q>>
 for HashMap<K, V, S>
 	where K: Borrow<Q> {
-	type Occ<'a>
+	type Occupied<'a>
 		where
 			Self: 'a, Q: 'a
 	= crate::RefOccupiedEntry<hash_map::RawOccupiedEntryMut<'a, K, V, S>, HashMap<K, V, S>>;
-	type Vac<'a>
+	type Vacant<'a>
 		where
 			Self: 'a,
 			Q: 'a,

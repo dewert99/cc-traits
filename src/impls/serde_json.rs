@@ -177,8 +177,8 @@ impl<'a> VacantEntry<'a, serde_json::Map<String, serde_json::Value>> for serde_j
 
 
 impl EntryTypes<EntryFlag> for serde_json::Map<String, serde_json::Value> {
-	type Occ<'a> = serde_json::map::OccupiedEntry<'a>;
-	type Vac<'a> = serde_json::map::VacantEntry<'a>;
+	type Occupied<'a> = serde_json::map::OccupiedEntry<'a>;
+	type Vacant<'a> = serde_json::map::VacantEntry<'a>;
 }
 
 impl EntryApi for serde_json::Map<String, serde_json::Value> {
